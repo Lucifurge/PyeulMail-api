@@ -1,7 +1,7 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const bodyParser = require('body-parser');
-const cors = require('cors'); 
+const cors = require('cors');
 const { SMTPServer } = require('smtp-server');
 const { simpleParser } = require('mailparser'); // For parsing emails
 
@@ -26,7 +26,7 @@ const isExpired = (expiresAt) => {
 
 // Generate a new temp email
 app.post('/generate', async (req, res) => {
-  const { username, domain } = req.body; // Expecting username and domain from frontend
+  const { username, domain } = req.body;
 
   if (!username || !domain) {
     return res.status(400).json({ error: 'Username and domain are required.' });
@@ -35,7 +35,7 @@ app.post('/generate', async (req, res) => {
   const tempEmail = `${username}${domain}`;
   
   // Set expiration to 1 day (24 hours)
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // Expires in 1 day
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   const { data, error } = await supabase
     .from('temp_emails')
@@ -63,10 +63,7 @@ app.get('/inbox/:inbox', async (req, res) => {
 
   const result = [];
   for (const email of emails) {
-    if (isExpired(email.expires_at)) {
-      // Skip expired emails
-      continue;
-    }
+    if (isExpired(email.expires_at)) continue;
 
     const { data: messages, error: messagesError } = await supabase
       .from('email_messages')
@@ -120,7 +117,6 @@ app.post('/emails/:email', async (req, res) => {
   const { email } = req.params;
   const { sender, subject, content } = req.body;
 
-  // Check if the temporary email exists
   const { data: tempEmail, error: emailError } = await supabase
     .from('temp_emails')
     .select('expires_at')
@@ -135,7 +131,6 @@ app.post('/emails/:email', async (req, res) => {
     return res.status(410).json({ error: 'Email address has expired.' });
   }
 
-  // Insert the email message into the database
   const { data, error } = await supabase
     .from('email_messages')
     .insert([{ email, sender, subject, content }]);
@@ -144,15 +139,14 @@ app.post('/emails/:email', async (req, res) => {
     return res.status(500).json({ error: 'Failed to save email message.', details: error });
   }
 
-  // Extract the code from the email content (for authentication codes)
-  const codeMatch = content.match(/(\d{6,})/);  // Assuming the code is a 6-digit number
+  const codeMatch = content.match(/(\d{6,})/);
   if (codeMatch) {
-    const code = codeMatch[0];  // Extracted code
+    const code = codeMatch[0];
     console.log(`Authentication Code: ${code}`);
-    res.status(200).json({ message: 'Email received with code', code });
-  } else {
-    res.status(200).json({ message: 'Email received without code.' });
+    return res.status(200).json({ message: 'Email received with code', code });
   }
+
+  res.status(200).json({ message: 'Email received without code.' });
 });
 
 // Start the SMTP server to listen for incoming emails
@@ -163,13 +157,11 @@ const smtpServer = new SMTPServer({
         return callback(err);
       }
 
-      // Log the parsed email
       console.log('Received email:', parsed);
 
       const { from, subject, text } = parsed;
-      const recipientEmail = session.envelope.rcptTo[0]; // The recipient email (the temp email)
+      const recipientEmail = session.envelope.rcptTo[0]; // The temp email
 
-      // Check if the temp email exists in Supabase
       const { data: tempEmail, error: emailError } = await supabase
         .from('temp_emails')
         .select('expires_at')
@@ -180,17 +172,9 @@ const smtpServer = new SMTPServer({
         return callback(new Error('Temporary email not found.'));
       }
 
-      // Store the email in Supabase
       const { data, error } = await supabase
         .from('email_messages')
-        .insert([
-          {
-            email: recipientEmail,
-            sender: from.text,
-            subject,
-            content: text,
-          },
-        ]);
+        .insert([{ email: recipientEmail, sender: from.text, subject, content: text }]);
 
       if (error) {
         return callback(error);
@@ -201,8 +185,9 @@ const smtpServer = new SMTPServer({
   },
 });
 
-smtpServer.listen(25, () => {
-  console.log('SMTP server listening on port 25');
+// Try using port 587 or 465 if port 25 is blocked
+smtpServer.listen(587, () => {
+  console.log('SMTP server listening on port 587');
 });
 
 // Start Express server
