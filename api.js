@@ -3,7 +3,7 @@ const { createClient } = require('@supabase/supabase-js');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const { SMTPServer } = require('smtp-server');
-const { simpleParser } = require('mailparser'); // For parsing emails
+const { simpleParser } = require('mailparser');
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://ocdcqlcqeqrizxbvfiwp.supabase.co'; // Replace with your Supabase URL
@@ -41,7 +41,7 @@ app.post('/generate', async (req, res) => {
     return res.status(400).json({ error: 'Username and domain are required.' });
   }
 
-  const tempEmail = `${username}${domain}`;
+  const tempEmail = `${username}@${domain}`; // Add @ before domain
   
   // Set expiration to 1 day (24 hours)
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
