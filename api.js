@@ -31,6 +31,12 @@ const isExpired = (expiresAt) => {
   return new Date(expiresAt) <= new Date();
 };
 
+// Helper function to validate email format
+const isValidEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
 // API Routes
 
 // Generate a new temp email
@@ -41,7 +47,11 @@ app.post('/generate', async (req, res) => {
     return res.status(400).json({ error: 'Username and domain are required.' });
   }
 
-  const tempEmail = `${username}@${domain}`; // Add @ before domain
+  const tempEmail = `${username}@${domain}`; // Correctly format the email
+
+  if (!isValidEmail(tempEmail)) {
+    return res.status(400).json({ error: 'Invalid email format.' });
+  }
   
   // Set expiration to 1 day (24 hours)
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -76,7 +86,7 @@ app.get('/inbox/:inbox', async (req, res) => {
 
     const { data: messages, error: messagesError } = await supabase
       .from('email_messages')
-      .select('sender, subject, content, received_at')
+      .select('sender, subject, received_at') // Select only the needed fields
       .eq('email', email.email);
 
     if (messagesError) {
@@ -124,7 +134,7 @@ app.delete('/cleanup', async (req, res) => {
 // Endpoint to simulate receiving an email (for testing purposes)
 app.post('/emails/:email', async (req, res) => {
   const { email } = req.params;
-  const { sender, subject, content } = req.body;
+  const { sender, subject } = req.body; // Removed content
 
   const { data: tempEmail, error: emailError } = await supabase
     .from('temp_emails')
@@ -142,20 +152,13 @@ app.post('/emails/:email', async (req, res) => {
 
   const { data, error } = await supabase
     .from('email_messages')
-    .insert([{ email, sender, subject, content }]);
+    .insert([{ email, sender, subject, received_at: new Date().toISOString() }]); // Store only the required fields
 
   if (error) {
     return res.status(500).json({ error: 'Failed to save email message.', details: error });
   }
 
-  const codeMatch = content.match(/(\d{6,})/);
-  if (codeMatch) {
-    const code = codeMatch[0];
-    console.log(`Authentication Code: ${code}`);
-    return res.status(200).json({ message: 'Email received with code', code });
-  }
-
-  res.status(200).json({ message: 'Email received without code.' });
+  res.status(200).json({ message: 'Email received and stored.' });
 });
 
 // Start the SMTP server to listen for incoming emails
@@ -169,15 +172,13 @@ const smtpServer = new SMTPServer({
 
       console.log('Received email:', parsed);
 
-      const { from, subject, text, html } = parsed;
-      const content = text || html; // Ensure we capture either text or HTML content
+      const { from, subject } = parsed; // Removed content
       const recipientEmail = session.envelope.rcptTo[0].address; // The temp email
 
       console.log('Parsed email details:', {
         recipientEmail,
         from: from.text,
         subject,
-        content,
       });
 
       try {
@@ -194,7 +195,7 @@ const smtpServer = new SMTPServer({
 
         const { data, error } = await supabase
           .from('email_messages')
-          .insert([{ email: recipientEmail, sender: from.text, subject, content }]);
+          .insert([{ email: recipientEmail, sender: from.text, subject, received_at: new Date().toISOString() }]); // Store only the required fields
 
         if (error) {
           console.error('Error inserting email message:', error);
