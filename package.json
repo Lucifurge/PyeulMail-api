@@ -1,10 +1,21 @@
 {
+  "name": "pyeulmail",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
   "dependencies": {
-    "axios": "^1.7.9",
+    "@supabase/supabase-js": "^2.48.1",
     "body-parser": "^1.20.3",
-    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "express": "^4.21.2",
-    "puppeteer": "^24.1.1"
+    "mailparser": "^3.7.2",
+    "smtp-server": "^3.13.6",
+    "uuid": "^11.0.5"
   }
 }
