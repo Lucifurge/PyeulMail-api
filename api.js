@@ -225,3 +225,6 @@ smtpServer.listen(587, () => {
 });
 
 // Start Express server
+app.listen(PORT, () => {
+  console.log(`Temp Mail API running on port ${PORT}`);
+});
