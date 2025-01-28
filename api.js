@@ -210,6 +210,13 @@ const smtpServer = new SMTPServer({
       }
     });
   },
+  disabledCommands: ['AUTH'], // Disable authentication since you mentioned you don't use it
+  onConnect(session, callback) {
+    console.log(`Connection from ${session.remoteAddress}`);
+    callback(); // Accept the connection
+  },
+  // Add the SMTP server domain
+  name: 'smtp.reyzhaven.com'
 });
 
 // Try using port 587 or 465 if port 25 is blocked
@@ -218,6 +225,3 @@ smtpServer.listen(587, () => {
 });
 
 // Start Express server
-app.listen(PORT, () => {
-  console.log(`Temp Mail API running on port ${PORT}`);
-});
