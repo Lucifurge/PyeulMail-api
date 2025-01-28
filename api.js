@@ -12,6 +12,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const ALLOWED_IP = '199.59.243.227'; // Add your authorized IP address here
 
 // Middleware
 app.use(cors()); // Enable CORS for all routes
@@ -21,6 +22,19 @@ app.use(bodyParser.json()); // Parse JSON data
 const isExpired = (expiresAt) => {
   return new Date(expiresAt) <= new Date();
 };
+
+// Middleware to check IP address
+const checkIP = (req, res, next) => {
+  const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+  if (ip === ALLOWED_IP) {
+    next();
+  } else {
+    res.status(403).json({ error: 'Unauthorized IP address' });
+  }
+};
+
+// Apply IP check middleware to all routes
+app.use(checkIP);
 
 // API Routes
 
