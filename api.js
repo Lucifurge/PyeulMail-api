@@ -163,33 +163,50 @@ const smtpServer = new SMTPServer({
   onData(stream, session, callback) {
     simpleParser(stream, async (err, parsed) => {
       if (err) {
+        console.error('Error parsing email:', err);
         return callback(err);
       }
 
       console.log('Received email:', parsed);
 
-      const { from, subject, text } = parsed;
-      const recipientEmail = session.envelope.rcptTo[0]; // The temp email
+      const { from, subject, text, html } = parsed;
+      const content = text || html; // Ensure we capture either text or HTML content
+      const recipientEmail = session.envelope.rcptTo[0].address; // The temp email
 
-      const { data: tempEmail, error: emailError } = await supabase
-        .from('temp_emails')
-        .select('expires_at')
-        .eq('email', recipientEmail)
-        .single();
+      console.log('Parsed email details:', {
+        recipientEmail,
+        from: from.text,
+        subject,
+        content,
+      });
 
-      if (!tempEmail) {
-        return callback(new Error('Temporary email not found.'));
+      try {
+        const { data: tempEmail, error: emailError } = await supabase
+          .from('temp_emails')
+          .select('expires_at')
+          .eq('email', recipientEmail)
+          .single();
+
+        if (emailError || !tempEmail) {
+          console.error('Temporary email not found or error fetching it:', emailError);
+          return callback(new Error('Temporary email not found.'));
+        }
+
+        const { data, error } = await supabase
+          .from('email_messages')
+          .insert([{ email: recipientEmail, sender: from.text, subject, content }]);
+
+        if (error) {
+          console.error('Error inserting email message:', error);
+          return callback(error);
+        }
+
+        console.log('Email message inserted successfully:', data);
+        callback(null, 'Message received');
+      } catch (err) {
+        console.error('Error handling email:', err);
+        callback(err);
       }
-
-      const { data, error } = await supabase
-        .from('email_messages')
-        .insert([{ email: recipientEmail, sender: from.text, subject, content: text }]);
-
-      if (error) {
-        return callback(error);
-      }
-
-      callback(null, 'Message received');
     });
   },
 });
