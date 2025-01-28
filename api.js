@@ -25,19 +25,18 @@ const isExpired = (expiresAt) => {
 
 // Generate a new temp email
 app.post('/generate', async (req, res) => {
-  const { inbox } = req.body;
+  const { username, domain } = req.body; // Expecting username and domain from frontend
 
-  if (!inbox) {
-    return res.status(400).json({ error: 'Inbox name is required.' });
+  if (!username || !domain) {
+    return res.status(400).json({ error: 'Username and domain are required.' });
   }
 
-  const uniqueId = uuidv4();
-  const tempEmail = `${uniqueId}@pyeul.reyzhaven.com`;
+  const tempEmail = `${username}${domain}`;
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // Expires in 10 minutes
 
   const { data, error } = await supabase
     .from('temp_emails')
-    .insert([{ email: tempEmail, inbox, expires_at: expiresAt }]);
+    .insert([{ email: tempEmail, inbox: username, expires_at: expiresAt }]);
 
   if (error) {
     return res.status(500).json({ error: 'Failed to create temp email.', details: error });
@@ -81,34 +80,20 @@ app.get('/inbox/:inbox', async (req, res) => {
   res.status(200).json(result);
 });
 
-// Simulate receiving an email (for testing purposes)
-app.post('/emails/:email', async (req, res) => {
+// Delete the temporary email
+app.delete('/delete/:email', async (req, res) => {
   const { email } = req.params;
-  const { sender, subject, content } = req.body;
-
-  const { data: tempEmail, error: emailError } = await supabase
-    .from('temp_emails')
-    .select('expires_at')
-    .eq('email', email)
-    .single();
-
-  if (!tempEmail) {
-    return res.status(404).json({ error: 'Email address not found.' });
-  }
-
-  if (emailError || isExpired(tempEmail.expires_at)) {
-    return res.status(410).json({ error: 'Email address has expired.' });
-  }
 
   const { data, error } = await supabase
-    .from('email_messages')
-    .insert([{ email, sender, subject, content }]);
+    .from('temp_emails')
+    .delete()
+    .eq('email', email);
 
   if (error) {
-    return res.status(500).json({ error: 'Failed to save email message.', details: error });
+    return res.status(500).json({ error: 'Failed to delete temp email.', details: error });
   }
 
-  res.status(200).json({ message: 'Email received.' });
+  res.status(200).json({ message: `Email ${email} deleted successfully.` });
 });
 
 // Clean up expired emails
