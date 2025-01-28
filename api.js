@@ -12,7 +12,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const ALLOWED_IP = '199.59.243.227'; // Add your authorized IP address here
+const ALLOWED_IP = process.env.ALLOWED_IP || '199.59.243.227'; // Use environment variable for authorized IP address
 
 // Middleware
 const allowedOrigins = ['https://pyeulmails.onrender.com'];
@@ -32,13 +32,17 @@ const isExpired = (expiresAt) => {
   return new Date(expiresAt) <= new Date();
 };
 
-// Middleware to check IP address
+// Middleware to check IP address, only if ALLOWED_IP is set
 const checkIP = (req, res, next) => {
-  const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-  if (ip === ALLOWED_IP) {
-    next();
+  if (ALLOWED_IP) {
+    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    if (ip === ALLOWED_IP) {
+      next();
+    } else {
+      return res.status(403).json({ error: 'Unauthorized IP address' });
+    }
   } else {
-    res.status(403).json({ error: 'Unauthorized IP address' });
+    next();
   }
 };
 
