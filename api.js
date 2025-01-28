@@ -1,87 +1,129 @@
-// Required Packages
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const bodyParser = require('body-parser');
+const { createClient } = require('@supabase/supabase-js');
 
-// Initialize Express app
+// Supabase Configuration
+const SUPABASE_URL = 'https://ocdcqlcqeqrizxbvfiwp.supabase.co'; // Replace with your Supabase URL
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9jZGNxbGNxZXFyaXp4YnZmaXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc1MzkwOTEsImV4cCI6MjA1MzExNTA5MX0.g9rGkVFMxI8iqBNtGzeDvkDGfbmSZhq7J32LITaTkq0'; // Replace with your Supabase key
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware to parse JSON bodies
+// Middleware
 app.use(bodyParser.json());
 
-// In-memory data store for temp emails and messages
-const tempEmails = {}; // { email: { createdAt, expiresAt } }
-const emailMessages = {}; // { email: [{ sender, subject, content, receivedAt }] }
-
-// Helper function to check if email is expired
-const isExpired = (email) => {
-  const now = Date.now();
-  return tempEmails[email] && tempEmails[email].expiresAt <= now;
+// Helper function to check expiration
+const isExpired = (expiresAt) => {
+  return new Date(expiresAt) <= new Date();
 };
 
 // API Routes
 
 // Generate a new temp email
-app.post('/generate', (req, res) => {
+app.post('/generate', async (req, res) => {
+  const { inbox } = req.body;
+
+  if (!inbox) {
+    return res.status(400).json({ error: 'Inbox name is required.' });
+  }
+
   const uniqueId = uuidv4();
   const tempEmail = `${uniqueId}@pyeul.reyzhaven.com`;
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // Expires in 10 minutes
 
-  // Set expiration to 10 minutes (600000 ms)
-  const expiresAt = Date.now() + 600000;
+  const { data, error } = await supabase
+    .from('temp_emails')
+    .insert([{ email: tempEmail, inbox, expires_at: expiresAt }]);
 
-  tempEmails[tempEmail] = { createdAt: Date.now(), expiresAt };
-  emailMessages[tempEmail] = [];
+  if (error) {
+    return res.status(500).json({ error: 'Failed to create temp email.', details: error });
+  }
 
   res.status(201).json({ tempEmail, expiresAt });
 });
 
-// Fetch emails for a temp email
-app.get('/emails/:email', (req, res) => {
-  const email = req.params.email;
+// Fetch all emails for a specific inbox
+app.get('/inbox/:inbox', async (req, res) => {
+  const { inbox } = req.params;
 
-  if (!tempEmails[email]) {
-    return res.status(404).json({ error: 'Email address not found.' });
+  const { data: emails, error } = await supabase
+    .from('temp_emails')
+    .select('email, created_at, expires_at')
+    .eq('inbox', inbox);
+
+  if (error) {
+    return res.status(500).json({ error: 'Failed to fetch inbox emails.', details: error });
   }
 
-  if (isExpired(email)) {
-    delete tempEmails[email];
-    delete emailMessages[email];
-    return res.status(410).json({ error: 'Email address has expired.' });
+  const result = [];
+  for (const email of emails) {
+    if (isExpired(email.expires_at)) {
+      // Skip expired emails
+      continue;
+    }
+
+    const { data: messages, error: messagesError } = await supabase
+      .from('email_messages')
+      .select('sender, subject, content, received_at')
+      .eq('email', email.email);
+
+    if (messagesError) {
+      return res.status(500).json({ error: 'Failed to fetch email messages.', details: messagesError });
+    }
+
+    result.push({ email: email.email, messages });
   }
 
-  res.status(200).json({ emails: emailMessages[email] });
+  res.status(200).json(result);
 });
 
 // Simulate receiving an email (for testing purposes)
-app.post('/emails/:email', (req, res) => {
-  const email = req.params.email;
+app.post('/emails/:email', async (req, res) => {
+  const { email } = req.params;
   const { sender, subject, content } = req.body;
 
-  if (!tempEmails[email]) {
+  const { data: tempEmail, error: emailError } = await supabase
+    .from('temp_emails')
+    .select('expires_at')
+    .eq('email', email)
+    .single();
+
+  if (!tempEmail) {
     return res.status(404).json({ error: 'Email address not found.' });
   }
 
-  if (isExpired(email)) {
-    delete tempEmails[email];
-    delete emailMessages[email];
+  if (emailError || isExpired(tempEmail.expires_at)) {
     return res.status(410).json({ error: 'Email address has expired.' });
   }
 
-  emailMessages[email].push({ sender, subject, content, receivedAt: new Date() });
+  const { data, error } = await supabase
+    .from('email_messages')
+    .insert([{ email, sender, subject, content }]);
+
+  if (error) {
+    return res.status(500).json({ error: 'Failed to save email message.', details: error });
+  }
+
   res.status(200).json({ message: 'Email received.' });
 });
 
-// Clean up expired emails (optional background job simulation)
-setInterval(() => {
-  const now = Date.now();
-  for (const email in tempEmails) {
-    if (tempEmails[email].expiresAt <= now) {
-      delete tempEmails[email];
-      delete emailMessages[email];
-    }
+// Clean up expired emails
+app.delete('/cleanup', async (req, res) => {
+  const now = new Date().toISOString();
+
+  const { error } = await supabase
+    .from('temp_emails')
+    .delete()
+    .lte('expires_at', now);
+
+  if (error) {
+    return res.status(500).json({ error: 'Failed to clean up expired emails.', details: error });
   }
-}, 60000); // Run every minute
+
+  res.status(200).json({ message: 'Expired emails cleaned up.' });
+});
 
 // Start the server
 app.listen(PORT, () => {
