@@ -6,7 +6,7 @@ const cors = require('cors'); // Import the CORS package
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://ocdcqlcqeqrizxbvfiwp.supabase.co'; // Replace with your Supabase URL
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9jZGNxbGNxZXFyaXp4YnZmaXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc1MzkwOTEsImV4cCI6MjA1MzExNTA5MX0.g9rGkVFMxI8iqBNtGzeDvkDGfbmSZhq7J32LITaTkq0'; // Replace with your Supabase key
+const SUPABASE_KEY = 'YOUR_SUPABASE_KEY'; // Replace with your Supabase key
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const app = express();
@@ -32,7 +32,9 @@ app.post('/generate', async (req, res) => {
   }
 
   const tempEmail = `${username}${domain}`;
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // Expires in 10 minutes
+  
+  // Set expiration to 1 day (24 hours)
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // Expires in 1 day
 
   const { data, error } = await supabase
     .from('temp_emails')
@@ -110,6 +112,47 @@ app.delete('/cleanup', async (req, res) => {
   }
 
   res.status(200).json({ message: 'Expired emails cleaned up.' });
+});
+
+// Endpoint to simulate receiving an email (for testing purposes)
+app.post('/emails/:email', async (req, res) => {
+  const { email } = req.params;
+  const { sender, subject, content } = req.body;
+
+  // Check if the temporary email exists
+  const { data: tempEmail, error: emailError } = await supabase
+    .from('temp_emails')
+    .select('expires_at')
+    .eq('email', email)
+    .single();
+
+  if (!tempEmail) {
+    return res.status(404).json({ error: 'Email address not found.' });
+  }
+
+  if (emailError || isExpired(tempEmail.expires_at)) {
+    return res.status(410).json({ error: 'Email address has expired.' });
+  }
+
+  // Insert the email message into the database
+  const { data, error } = await supabase
+    .from('email_messages')
+    .insert([{ email, sender, subject, content }]);
+
+  if (error) {
+    return res.status(500).json({ error: 'Failed to save email message.', details: error });
+  }
+
+  // Extract the code from the email content (for authentication codes)
+  const codeMatch = content.match(/(\d{6,})/);  // Assuming the code is a 6-digit number
+  if (codeMatch) {
+    const code = codeMatch[0];  // Extracted code
+    console.log(`Authentication Code: ${code}`);
+    // You can store this code or send it back as part of the response
+    res.status(200).json({ message: 'Email received with code', code });
+  } else {
+    res.status(200).json({ message: 'Email received without code.' });
+  }
 });
 
 // Start the server
