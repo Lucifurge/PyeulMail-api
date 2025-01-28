@@ -15,7 +15,16 @@ const PORT = process.env.PORT || 3000;
 const ALLOWED_IP = '199.59.243.227'; // Add your authorized IP address here
 
 // Middleware
-app.use(cors()); // Enable CORS for all routes
+const allowedOrigins = ['https://pyeulmails.onrender.com'];
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+}));
 app.use(bodyParser.json()); // Parse JSON data
 
 // Helper function to check expiration
