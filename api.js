@@ -1,12 +1,13 @@
 const express = require('express');
-const { v4: uuidv4 } = require('uuid');
-const bodyParser = require('body-parser');
 const { createClient } = require('@supabase/supabase-js');
-const cors = require('cors'); // Import the CORS package
+const bodyParser = require('body-parser');
+const cors = require('cors'); 
+const { SMTPServer } = require('smtp-server');
+const { simpleParser } = require('mailparser'); // For parsing emails
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://ocdcqlcqeqrizxbvfiwp.supabase.co'; // Replace with your Supabase URL
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9jZGNxbGNxZXFyaXp4YnZmaXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc1MzkwOTEsImV4cCI6MjA1MzExNTA5MX0.g9rGkVFMxI8iqBNtGzeDvkDGfbmSZhq7J32LITaTkq0'; // Replace with your Supabase key
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9jZGNxbGNxZXFyaXp4YnZmaXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc1MzkwOTEsImV4cCI6MjA1MzExNTA5MX0.g9rGkVFMxI8iqBNtGzeDvkDGfbmSZhq7J32LITaTkq0'; // Replace with your Supabase Key
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const app = express();
@@ -14,7 +15,7 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors()); // Enable CORS for all routes
-app.use(bodyParser.json());
+app.use(bodyParser.json()); // Parse JSON data
 
 // Helper function to check expiration
 const isExpired = (expiresAt) => {
@@ -148,14 +149,63 @@ app.post('/emails/:email', async (req, res) => {
   if (codeMatch) {
     const code = codeMatch[0];  // Extracted code
     console.log(`Authentication Code: ${code}`);
-    // You can store this code or send it back as part of the response
     res.status(200).json({ message: 'Email received with code', code });
   } else {
     res.status(200).json({ message: 'Email received without code.' });
   }
 });
 
-// Start the server
+// Start the SMTP server to listen for incoming emails
+const smtpServer = new SMTPServer({
+  onData(stream, session, callback) {
+    simpleParser(stream, async (err, parsed) => {
+      if (err) {
+        return callback(err);
+      }
+
+      // Log the parsed email
+      console.log('Received email:', parsed);
+
+      const { from, subject, text } = parsed;
+      const recipientEmail = session.envelope.rcptTo[0]; // The recipient email (the temp email)
+
+      // Check if the temp email exists in Supabase
+      const { data: tempEmail, error: emailError } = await supabase
+        .from('temp_emails')
+        .select('expires_at')
+        .eq('email', recipientEmail)
+        .single();
+
+      if (!tempEmail) {
+        return callback(new Error('Temporary email not found.'));
+      }
+
+      // Store the email in Supabase
+      const { data, error } = await supabase
+        .from('email_messages')
+        .insert([
+          {
+            email: recipientEmail,
+            sender: from.text,
+            subject,
+            content: text,
+          },
+        ]);
+
+      if (error) {
+        return callback(error);
+      }
+
+      callback(null, 'Message received');
+    });
+  },
+});
+
+smtpServer.listen(25, () => {
+  console.log('SMTP server listening on port 25');
+});
+
+// Start Express server
 app.listen(PORT, () => {
   console.log(`Temp Mail API running on port ${PORT}`);
 });
