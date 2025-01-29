@@ -67,5 +67,5 @@ const smtpServer = new SMTPServer({
 });
 
 smtpServer.listen(465, () => {
-  console.log('SMTP server listening on port 25');
+  console.log('SMTP server listening on port 465');
 });
