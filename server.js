@@ -1,11 +1,31 @@
 const { SMTPServer } = require('smtp-server');
 const { simpleParser } = require('mailparser');
 const { createClient } = require('@supabase/supabase-js');
+const cors = require('cors');
+const express = require('express');
+const app = express();
+const PORT = process.env.PORT || 8080;
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://ocdcqlcqeqrizxbvfiwp.supabase.co'; // Replace with your Supabase URL
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9jZGNxbGNxZXFyaXp4YnZmaXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc1MzkwOTEsImV4cCI6MjA1MzExNTA5MX0.g9rGkVFMxI8iqBNtGzeDvkDGfbmSZhq7J32LITaTkq0'; // Replace with your Supabase Key
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// CORS Middleware
+const allowedOrigins = ['https://pyeulmails.onrender.com'];
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+app.options('*', cors()); // Preflight requests handling
 
 // SMTP Server Configuration
 const smtpServer = new SMTPServer({
@@ -58,12 +78,16 @@ const smtpServer = new SMTPServer({
       }
     });
   },
-  disabledCommands: ['AUTH'], // Disable authentication since you mentioned you don't use it
+  disabledCommands: ['AUTH'],
   onConnect(session, callback) {
     console.log(`Connection from ${session.remoteAddress}`);
     callback();
   },
   name: 'smtp.jadepremiumservices.com'
+});
+
+app.listen(PORT, () => {
+  console.log(`Temp Mail API running on port ${PORT}`);
 });
 
 smtpServer.listen(465, () => {
