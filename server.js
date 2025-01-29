@@ -4,7 +4,7 @@ const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
 const express = require('express');
 const app = express();
-const PORT = 465;
+const SMTP_PORT = 465;
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://ocdcqlcqeqrizxbvfiwp.supabase.co'; // Replace with your Supabase URL
@@ -86,10 +86,10 @@ const smtpServer = new SMTPServer({
   name: 'smtp.jadepremiumservices.com'
 });
 
-app.listen(PORT, () => {
-  console.log(`SMTP server running on port ${PORT}`);
+app.listen(SMTP_PORT, () => {
+  console.log(`SMTP server running on port ${SMTP_PORT}`);
 });
 
-smtpServer.listen(465, () => {
+smtpServer.listen(SMTP_PORT, () => {
   console.log('SMTP server listening on port 465');
 });
