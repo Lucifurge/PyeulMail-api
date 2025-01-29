@@ -11,7 +11,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// Middleware
+// CORS Middleware
 const allowedOrigins = ['https://pyeulmails.onrender.com'];
 app.use(cors({
   origin: (origin, callback) => {
@@ -20,8 +20,13 @@ app.use(cors({
     } else {
       callback(new Error('Not allowed by CORS'));
     }
-  }
+  },
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
+app.options('*', cors()); // Preflight requests handling
+
 app.use(bodyParser.json());
 
 const isExpired = (expiresAt) => {
