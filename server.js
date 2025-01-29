@@ -4,7 +4,7 @@ const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
 const express = require('express');
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = 465;
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://ocdcqlcqeqrizxbvfiwp.supabase.co'; // Replace with your Supabase URL
@@ -87,7 +87,7 @@ const smtpServer = new SMTPServer({
 });
 
 app.listen(PORT, () => {
-  console.log(`Temp Mail API running on port ${PORT}`);
+  console.log(`SMTP server running on port ${PORT}`);
 });
 
 smtpServer.listen(465, () => {
