@@ -66,6 +66,6 @@ const smtpServer = new SMTPServer({
   name: 'smtp.jadepremiumservices.com'
 });
 
-smtpServer.listen(25, () => {
+smtpServer.listen(465, () => {
   console.log('SMTP server listening on port 25');
 });
