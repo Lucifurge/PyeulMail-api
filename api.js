@@ -2,12 +2,10 @@ const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const { SMTPServer } = require('smtp-server');
-const { simpleParser } = require('mailparser');
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://ocdcqlcqeqrizxbvfiwp.supabase.co'; // Replace with your Supabase URL
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9jZGNxbGNxZXFyaXp4YnZmaXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc1MzkwOTEsImV4cCI6MjA1MzExNTA5MX0.g9rGkVFMxI8iqBNtGzeDvkDGfbmSZhq7J32LITaTkq0'; // Replace with your Supabase Key
+const SUPABASE_KEY = 'your_supabase_key'; // Replace with your Supabase Key
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const app = express();
@@ -24,20 +22,16 @@ app.use(cors({
     }
   }
 }));
-app.use(bodyParser.json()); // Parse JSON data
+app.use(bodyParser.json());
 
-// Helper function to check expiration
 const isExpired = (expiresAt) => {
   return new Date(expiresAt) <= new Date();
 };
 
-// Helper function to validate email format
 const isValidEmail = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 };
-
-// API Routes
 
 // Generate a new temp email
 app.post('/generate', async (req, res) => {
@@ -47,13 +41,12 @@ app.post('/generate', async (req, res) => {
     return res.status(400).json({ error: 'Username and domain are required.' });
   }
 
-  const tempEmail = `${username}@${domain}`; // Correctly format the email
+  const tempEmail = `${username}@${domain}`;
 
   if (!isValidEmail(tempEmail)) {
     return res.status(400).json({ error: 'Invalid email format.' });
   }
   
-  // Set expiration to 1 day (24 hours)
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   const { data, error } = await supabase
@@ -86,7 +79,7 @@ app.get('/inbox/:inbox', async (req, res) => {
 
     const { data: messages, error: messagesError } = await supabase
       .from('email_messages')
-      .select('sender, subject, received_at') // Select only the needed fields
+      .select('sender, subject, received_at')
       .eq('email', email.email);
 
     if (messagesError) {
@@ -131,100 +124,6 @@ app.delete('/cleanup', async (req, res) => {
   res.status(200).json({ message: 'Expired emails cleaned up.' });
 });
 
-// Endpoint to simulate receiving an email (for testing purposes)
-app.post('/emails/:email', async (req, res) => {
-  const { email } = req.params;
-  const { sender, subject } = req.body; // Removed content
-
-  const { data: tempEmail, error: emailError } = await supabase
-    .from('temp_emails')
-    .select('expires_at')
-    .eq('email', email)
-    .single();
-
-  if (!tempEmail) {
-    return res.status(404).json({ error: 'Email address not found.' });
-  }
-
-  if (emailError || isExpired(tempEmail.expires_at)) {
-    return res.status(410).json({ error: 'Email address has expired.' });
-  }
-
-  const { data, error } = await supabase
-    .from('email_messages')
-    .insert([{ email, sender, subject, received_at: new Date().toISOString() }]); // Store only the required fields
-
-  if (error) {
-    return res.status(500).json({ error: 'Failed to save email message.', details: error });
-  }
-
-  res.status(200).json({ message: 'Email received and stored.' });
-});
-
-// Start the SMTP server to listen for incoming emails
-const smtpServer = new SMTPServer({
-  onData(stream, session, callback) {
-    simpleParser(stream, async (err, parsed) => {
-      if (err) {
-        console.error('Error parsing email:', err);
-        return callback(err);
-      }
-
-      console.log('Received email:', parsed);
-
-      const { from, subject } = parsed; // Removed content
-      const recipientEmail = session.envelope.rcptTo[0].address; // The temp email
-
-      console.log('Parsed email details:', {
-        recipientEmail,
-        from: from.text,
-        subject,
-      });
-
-      try {
-        const { data: tempEmail, error: emailError } = await supabase
-          .from('temp_emails')
-          .select('expires_at')
-          .eq('email', recipientEmail)
-          .single();
-
-        if (emailError || !tempEmail) {
-          console.error('Temporary email not found or error fetching it:', emailError);
-          return callback(new Error('Temporary email not found.'));
-        }
-
-        const { data, error } = await supabase
-          .from('email_messages')
-          .insert([{ email: recipientEmail, sender: from.text, subject, received_at: new Date().toISOString() }]); // Store only the required fields
-
-        if (error) {
-          console.error('Error inserting email message:', error);
-          return callback(error);
-        }
-
-        console.log('Email message inserted successfully:', data);
-        callback(null, 'Message received');
-      } catch (err) {
-        console.error('Error handling email:', err);
-        callback(err);
-      }
-    });
-  },
-  disabledCommands: ['AUTH'], // Disable authentication since you mentioned you don't use it
-  onConnect(session, callback) {
-    console.log(`Connection from ${session.remoteAddress}`);
-    callback(); // Accept the connection
-  },
-  // Add the SMTP server domain
-  name: 'smtp.reyzhaven.com'
-});
-
-// Try using port 587 or 465 if port 25 is blocked
-smtpServer.listen(587, () => {
-  console.log('SMTP server listening on port 587');
-});
-
-// Start Express server
 app.listen(PORT, () => {
   console.log(`Temp Mail API running on port ${PORT}`);
 });
