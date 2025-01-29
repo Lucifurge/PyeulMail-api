@@ -9,9 +9,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // SMTP Server Configuration
 const smtpServer = new SMTPServer({
-  secure: true,
-  key: 'path/to/your/privatekey.pem', // Ensure you have your SSL certificate key
-  cert: 'path/to/your/certificate.pem', // Ensure you have your SSL certificate
+  secure: false, // Disable SSL/TLS for now
   onData(stream, session, callback) {
     simpleParser(stream, async (err, parsed) => {
       if (err) {
@@ -60,7 +58,7 @@ const smtpServer = new SMTPServer({
       }
     });
   },
-  disabledCommands: ['AUTH'],
+  disabledCommands: ['AUTH'], // Disable authentication since you mentioned you don't use it
   onConnect(session, callback) {
     console.log(`Connection from ${session.remoteAddress}`);
     callback();
@@ -68,6 +66,6 @@ const smtpServer = new SMTPServer({
   name: 'smtp.jadepremiumservices.com'
 });
 
-smtpServer.listen(465, () => {
-  console.log('SMTP server listening on port 465');
+smtpServer.listen(25, () => {
+  console.log('SMTP server listening on port 25');
 });
