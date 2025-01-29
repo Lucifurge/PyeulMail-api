@@ -125,7 +125,7 @@ app.delete('/cleanup', async (req, res) => {
     .lte('expires_at', now);
 
   if (error) {
-    return res.status 500).json({ error: 'Failed to clean up expired emails.', details: error });
+    return res.status(500).json({ error: 'Failed to clean up expired emails.', details: error });
   }
 
   res.status(200).json({ message: 'Expired emails cleaned up.' });
