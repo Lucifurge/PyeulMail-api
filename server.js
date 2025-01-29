@@ -7,8 +7,11 @@ const SUPABASE_URL = 'https://ocdcqlcqeqrizxbvfiwp.supabase.co'; // Replace with
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9jZGNxbGNxZXFyaXp4YnZmaXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc1MzkwOTEsImV4cCI6MjA1MzExNTA5MX0.g9rGkVFMxI8iqBNtGzeDvkDGfbmSZhq7J32LITaTkq0'; // Replace with your Supabase Key
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Start the SMTP server to listen for incoming emails
+// SMTP Server Configuration
 const smtpServer = new SMTPServer({
+  secure: true,
+  key: 'path/to/your/privatekey.pem', // Ensure you have your SSL certificate key
+  cert: 'path/to/your/certificate.pem', // Ensure you have your SSL certificate
   onData(stream, session, callback) {
     simpleParser(stream, async (err, parsed) => {
       if (err) {
@@ -65,6 +68,6 @@ const smtpServer = new SMTPServer({
   name: 'smtp.jadepremiumservices.com'
 });
 
-smtpServer.listen(587, () => {
-  console.log('SMTP server listening on port 587');
+smtpServer.listen(465, () => {
+  console.log('SMTP server listening on port 465');
 });
